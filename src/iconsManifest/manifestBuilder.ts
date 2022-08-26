@@ -1,5 +1,4 @@
 import { cloneDeep, sortBy, sortedUniq } from 'lodash';
-import { existsAsync } from '../common/fsAsync';
 import { ConfigManager } from '../configuration/configManager';
 import { constants } from '../constants';
 import * as models from '../models';
@@ -7,16 +6,21 @@ import { schema as defaultSchema } from '../models/iconsManifest';
 import { Utils } from '../utils';
 
 export class ManifestBuilder {
-  private static iconsDirRelativeBasePath: string;
-  private static customIconDirPath: string;
+  private iconsDirRelativeBasePath: string;
+  private customIconDirPath: string;
+  private utils: Utils;
 
-  public static async buildManifest(
+  constructor(private fs: models.IFSAsync) {
+    this.utils = new Utils(fs);
+  }
+
+  public async buildManifest(
     files: models.IFileCollection,
     folders: models.IFolderCollection,
     customIconsDirPath?: string,
   ): Promise<models.IIconSchema> {
     this.customIconDirPath = customIconsDirPath;
-    this.iconsDirRelativeBasePath = await Utils.getRelativePath(
+    this.iconsDirRelativeBasePath = await this.utils.getRelativePath(
       ConfigManager.sourceDir,
       ConfigManager.iconsDir,
     );
@@ -89,7 +93,7 @@ export class ManifestBuilder {
     return this.buildJsonStructure(files, folders, schema);
   }
 
-  private static async buildDefaultIconPath(
+  private async buildDefaultIconPath(
     defaultExtension: models.IDefaultExtension,
     schemaExtension: models.IIconPath,
     isOpenFolder: boolean,
@@ -110,7 +114,7 @@ export class ManifestBuilder {
     return Utils.pathUnixJoin(fPath, filename);
   }
 
-  private static async buildJsonStructure(
+  private async buildJsonStructure(
     files: models.IFileCollection,
     folders: models.IFolderCollection,
     schema: models.IIconSchema,
@@ -150,7 +154,7 @@ export class ManifestBuilder {
     return schema;
   }
 
-  private static buildFiles(
+  private buildFiles(
     files: models.IFileCollection,
     hasDefaultLightFile: boolean,
   ): Promise<models.IBuildFiles> {
@@ -266,7 +270,7 @@ export class ManifestBuilder {
     );
   }
 
-  private static buildFolders(
+  private buildFolders(
     folders: models.IFolderCollection,
     hasDefaultLightFolder: boolean,
   ): Promise<models.IBuildFolders> {
@@ -361,7 +365,7 @@ export class ManifestBuilder {
     );
   }
 
-  private static async getIconPath(filename: string): Promise<string> {
+  private async getIconPath(filename: string): Promise<string> {
     if (!this.customIconDirPath) {
       return this.iconsDirRelativeBasePath;
     }
@@ -380,15 +384,19 @@ export class ManifestBuilder {
     const sanitizedFolderPath: string = belongToSameDrive
       ? ConfigManager.sourceDir
       : Utils.overwriteDrive(absPath, ConfigManager.sourceDir);
-    return Utils.getRelativePath(sanitizedFolderPath, absPath, false);
+    return this.utils.getRelativePath(sanitizedFolderPath, absPath, false);
   }
 
-  private static async hasCustomIcon(
+  private async hasCustomIcon(
     folderPath: string,
     filename: string,
   ): Promise<boolean> {
-    const relativePath = await Utils.getRelativePath('.', folderPath, false);
+    const relativePath = await this.utils.getRelativePath(
+      '.',
+      folderPath,
+      false,
+    );
     const filePath = Utils.pathUnixJoin(relativePath, filename);
-    return existsAsync(filePath);
+    return this.fs.existsAsync(filePath);
   }
 }
